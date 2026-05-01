@@ -19,10 +19,10 @@
 - Passive PCAP analysis (MQTT, RTPS/DDS, gRPC) using scapy
 - Raw TLS 1.3 ClientHello / ServerHello parsing — extract `NamedGroup` (X25519, P-256, ML-KEM hybrid)
 - ROS2 DDS-Security discovery + primitive inventory
-- **PSYCHE**: Shor's circuit construction for discovered RSA moduli (Qiskit, toy scale first)
-- **PSYCHE**: Grover's oracle for discovered symmetric primitives (Simplified-AES first)
-- **DEUS**: resource estimation — logical qubits, physical qubits, megaqubit-days, hardware-availability timeline
-- **ACCELA**: PQC migration validation — replay the attack pipeline against the PQC-protected channel, confirm resistance
+- Shor's circuit construction for discovered RSA moduli (Qiskit, toy scale first)
+- Grover's oracle for discovered symmetric primitives (Simplified-AES first)
+- resource estimation — logical qubits, physical qubits, megaqubit-days, hardware-availability timeline
+- PQC migration validation — replay the attack pipeline against the PQC-protected channel, confirm resistance
 
 ## Install
 
@@ -42,7 +42,7 @@ pip install -e ".[dev]"          # + pytest, ruff
 # 1. Declare what you're authorized to test
 lain scope-init \
     --operator farid@wiewiorkaworks.com \
-    --targets mqtt.yorozuya.local 10.42.0.0/24 \
+    --targets mqtt.yorozuya.local 10.42.0.0/52 \
     --authorized-by "self (owner)" \
     --valid-until 2026-12-31T23:59:59+00:00 \
     --reference "internal security review"
