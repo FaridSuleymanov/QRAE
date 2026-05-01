@@ -1,93 +1,79 @@
-# LAIN
+# QRAE — Quantum Readiness Assessment Engine
 
-**Layered Attack Intelligence for Next-gen cryptography.**
+**QRAE** is an early-stage Python toolkit for authorized post-quantum cryptography readiness assessment.
+
+The project was originally developed under the working name **LAIN**, but the public technical framing is now focused on defensive assessment, auditability, and migration planning.
+
+QRAE inspects selected communication endpoints or channels, identifies cryptographic primitives where possible, classifies their exposure to quantum-relevant attack models, and records the assessment process in a tamper-evident audit log.
+
+> Status: alpha / research prototype.  
+> Current focus: TLS endpoint inspection, primitive classification, authorization scope control, and audit evidence.
 
 ---
 
-## What ships today
+## Purpose
 
-| Module | Capability |
+Many systems still depend on cryptographic primitives that are expected to be vulnerable or weakened in the presence of cryptographically relevant quantum computers.
+
+QRAE is designed to support practical questions such as:
+
+- Which cryptographic primitives are currently used by a system?
+- Which of them are affected by Shor's or Grover's algorithm?
+- Which findings require post-quantum migration planning?
+- Was the assessment performed inside an explicitly authorized scope?
+- Can the assessment trail be reviewed later?
+
+The goal is not to provide a general offensive tool. The goal is to create a repeatable, inspectable workflow for quantum-readiness assessment and post-quantum migration planning.
+
+---
+
+## Current capabilities
+
+| Area | Current implementation |
 |---|---|
-| `lain.protocol.tls` | Active TLS probe. Negotiates against target, extracts cipher + cert public key, classifies each against Shor's / Grover's. |
-| `lain.protocol.espargos` | ESPARGOS RF channel assessment. Flags zero-crypto channels, emits CNSA 2.0 / FIPS 203 migration recommendation. |
-| `lain.core.classify` | Quantum vulnerability classifier (NIST FIPS 203/204/205, CNSA 2.0, SP 800-208). |
-| `lain.core.audit` | Hash-chained append-only audit log. Every action is a SHA-256 block committed to the previous. `audit-verify` detects any tampering. |
-| `lain.core.scope` | Scope gate. No probe runs without a signed scope declaration covering the target. Exact / CIDR / wildcard matching. Expiry enforced. |
+| Authorization scope | Scope declaration with operator, target list, authorization reference, and expiry |
+| Audit trail | Append-only hash-chained JSONL audit log |
+| TLS assessment | Active TLS connection, negotiated cipher extraction, certificate public-key classification |
+| Primitive classification | Conservative classification of classical, symmetric, hash, and post-quantum primitives |
+| Structured output | JSON findings suitable for reporting, dashboards, or later SIEM integration |
+| ESPARGOS assessment | Explicit classification of an unprotected RF/data channel as requiring cryptographic protection |
+| Tests | Unit tests for audit integrity, scope logic, and primitive classification |
 
-## What's next
+---
 
-- Passive PCAP analysis (MQTT, RTPS/DDS, gRPC) using scapy
-- Raw TLS 1.3 ClientHello / ServerHello parsing — extract `NamedGroup` (X25519, P-256, ML-KEM hybrid)
-- ROS2 DDS-Security discovery + primitive inventory
-- Shor's circuit construction for discovered RSA moduli (Qiskit, toy scale first)
-- Grover's oracle for discovered symmetric primitives (Simplified-AES first)
-- resource estimation — logical qubits, physical qubits, megaqubit-days, hardware-availability timeline
-- PQC migration validation — replay the attack pipeline against the PQC-protected channel, confirm resistance
+## Quantum-risk model
 
-## Install
+QRAE currently uses a simple conservative model:
 
-```bash
-# from source
-git clone https://github.com/FaridSuleymanov/lain
-cd lain
-pip install -e .                 # core
-pip install -e ".[pcap]"         # + PCAP analysis (scapy)
-pip install -e ".[quantum]"      # + Qiskit backends (PSYCHE)
-pip install -e ".[dev]"          # + pytest, ruff
-```
+| Class | Meaning |
+|---|---|
+| `broken` | Primitive is expected to be broken by Shor's algorithm once a CRQC exists |
+| `weakened` | Primitive is affected by Grover's algorithm; effective security is reduced |
+| `resistant` | Primitive is recognized as post-quantum or hash-based in the current classifier table |
+| `unprotected` | No confidentiality, integrity, or authentication layer is present |
+| `unknown` | Primitive is not recognized and requires manual review |
 
-## Quickstart — testing your own robots
+Examples:
 
-```bash
-# 1. Declare what you're authorized to test
-lain scope-init \
-    --operator farid@wiewiorkaworks.com \
-    --targets mqtt.yorozuya.local 10.42.0.0/52 \
-    --authorized-by "self (owner)" \
-    --valid-until 2026-12-31T23:59:59+00:00 \
-    --reference "internal security review"
+- RSA, DSA, DH, ECDSA, ECDH, Ed25519, X25519 → Shor-relevant
+- AES, ChaCha20, SHA-2/SHA-3 families → Grover-relevant
+- ML-KEM, ML-DSA, SLH-DSA, XMSS, LMS → treated as post-quantum or quantum-resistant categories
+- Unknown primitives are not marked safe by default
 
-# 2. Probe the MQTT-TLS broker
-lain scan-tls mqtt.yorozuya.local --port 8883
+The classifier is intentionally conservative. Unknown does not mean secure.
 
-# 3. Flag the ESPARGOS RF channel
-lain scan-espargos --channel espargos-array-01
+---
 
-# 4. Verify the audit log hasn't been tampered with
-lain audit-verify
+## Architecture
 
-# 5. Walk the chain
-lain audit-show
-```
-
-Every invocation above appends to `audit.log` (hash-chained). Every probe
-checks `scope.json` (target membership + expiry) before touching the
-network. Both files are plain-text, inspectable, and designed to be
-handed to a CISO, a regulator, or a court.
-
-## Philosophy
-
-Red team tools that pull their punches are not red team tools. LAIN has
-two guardrails and no more:
-
-1. **Scope gate** — declare your authority before you probe. Mens rea marker.
-2. **Hash-chained audit log** — forensic trail, tamper-evident, regulator-ready.
-
-Beyond those, the tool does its job. It will factor the RSA modulus if
-you ask it to. DEUS will then tell you honestly that the circuit needs
-~2,500 logical qubits and a machine that won't exist for a decade. **That
-honesty is the point** — the tool itself is proof of when the attack
-becomes real.
-
-## Output format
-
-Findings are JSON. Every primitive carries `family`, `parameter_bits`,
-`role`, `vulnerability` (broken / weakened / resistant / unprotected /
-unknown), and `attack_class` (shor / grover / none). Easy to pipe into
-dashboards, SIEM, or your own scoring.
-
-## License
-
-AGPL-3.0-or-later. If you run a modified LAIN as a network-accessible
-service, you must make the modified source available to your users. No
-exceptions.
+```text
+qrae / lain
+├── cli.py                 # command-line interface
+├── core
+│   ├── audit.py           # hash-chained audit log
+│   ├── scope.py           # authorization scope model
+│   ├── classify.py        # quantum vulnerability classifier
+│   └── findings.py        # structured finding data model
+└── protocol
+    ├── tls.py             # TLS endpoint assessment
+    └── espargos.py        # unprotected channel assessment
